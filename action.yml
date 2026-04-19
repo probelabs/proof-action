@@ -1,0 +1,135 @@
+name: 'ReqProof Audit'
+description: 'Run ReqProof verification audit on your project'
+branding:
+  icon: 'check-circle'
+  color: 'blue'
+
+inputs:
+  fail-level:
+    description: 'Severity threshold for failure: error|warn|info'
+    required: false
+    default: 'warn'
+  format:
+    description: 'Output format: table|markdown|json|github'
+    required: false
+    default: 'markdown'
+  scope:
+    description: 'Audit scope: full|baseline'
+    required: false
+    default: 'full'
+  check:
+    description: 'Run only specific check(s), comma-separated'
+    required: false
+    default: ''
+  stage:
+    description: 'Run only checks for specific stage(s), comma-separated'
+    required: false
+    default: ''
+  version:
+    description: 'ReqProof version to install (default: latest)'
+    required: false
+    default: 'latest'
+  proof-path:
+    description: 'Path to pre-installed proof binary (skips installation)'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Working directory for the audit'
+    required: false
+    default: '.'
+
+outputs:
+  exit-code:
+    description: 'Audit exit code (0=pass, 1=errors, 2=warnings)'
+    value: ${{ steps.audit.outputs.exit-code }}
+  errors:
+    description: 'Number of audit errors'
+    value: ${{ steps.audit.outputs.errors }}
+  warnings:
+    description: 'Number of audit warnings'
+    value: ${{ steps.audit.outputs.warnings }}
+  summary:
+    description: 'One-line audit summary'
+    value: ${{ steps.audit.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install ReqProof
+      if: inputs.proof-path == ''
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        install_via_homebrew() {
+          if command -v brew &>/dev/null; then
+            echo "Installing proof via Homebrew..."
+            brew tap probelabs/proof
+            if [ "$INPUT_VERSION" = "latest" ]; then
+              brew install proof
+            else
+              brew install probelabs/proof/proof@${INPUT_VERSION}
+            fi
+            return 0
+          fi
+          return 1
+        }
+
+        install_via_download() {
+          echo "Installing proof via direct download..."
+          local os arch version_tag
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          arch="$(uname -m)"
+          case "$arch" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="arm64" ;;
+          esac
+
+          if [ "$INPUT_VERSION" = "latest" ]; then
+            version_tag="$(curl -sL -H 'Accept: application/vnd.github+json' \
+              https://api.github.com/repos/probelabs/proof/releases/latest \
+              | grep '"tag_name"' | head -1 | cut -d'"' -f4)"
+            if [ -z "$version_tag" ]; then
+              echo "::error::Failed to determine latest proof release version"
+              return 1
+            fi
+          else
+            version_tag="v${INPUT_VERSION#v}"
+          fi
+
+          local url="https://github.com/probelabs/proof/releases/download/${version_tag}/proof_${os}_${arch}.tar.gz"
+          echo "Downloading ${url}..."
+
+          local tmpdir
+          tmpdir="$(mktemp -d)"
+          if ! curl -fsSL "$url" | tar xz -C "$tmpdir"; then
+            echo "::error::Failed to download proof from ${url}"
+            rm -rf "$tmpdir"
+            return 1
+          fi
+
+          sudo install -m 0755 "${tmpdir}/proof" /usr/local/bin/proof
+          rm -rf "$tmpdir"
+        }
+
+        if ! install_via_homebrew; then
+          install_via_download
+        fi
+
+        echo "proof installed: $(proof --version)"
+
+    - name: Run ReqProof Audit
+      id: audit
+      shell: bash
+      env:
+        INPUT_FAIL_LEVEL: ${{ inputs.fail-level }}
+        INPUT_FORMAT: ${{ inputs.format }}
+        INPUT_SCOPE: ${{ inputs.scope }}
+        INPUT_CHECK: ${{ inputs.check }}
+        INPUT_STAGE: ${{ inputs.stage }}
+        INPUT_PROOF_PATH: ${{ inputs.proof-path }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        "${GITHUB_ACTION_PATH}/scripts/run-audit.sh"

@@ -1,0 +1,90 @@
+name: Test Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Test 1: Action works on a non-reqproof repo (should skip gracefully)
+  test-skip:
+    name: Test skip on non-ReqProof repo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create empty directory
+        run: mkdir -p /tmp/empty-project && cd /tmp/empty-project && git init
+
+      - uses: ./
+        id: audit
+        with:
+          working-directory: /tmp/empty-project
+
+      - name: Verify skipped
+        run: |
+          if [ "${{ steps.audit.outputs.exit-code }}" != "0" ]; then
+            echo "Expected exit-code 0 for non-ReqProof project, got ${{ steps.audit.outputs.exit-code }}"
+            exit 1
+          fi
+          echo "Correctly skipped non-ReqProof project"
+
+  # Test 2: Action installs proof and runs
+  test-install:
+    name: Test installation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create minimal ReqProof project
+        run: |
+          mkdir -p /tmp/test-project/specs/system/requirements
+          cat > /tmp/test-project/reqproof.yaml <<'YAML'
+          project: test-project
+          version: "1.0"
+          YAML
+          cat > /tmp/test-project/specs/system/requirements/sys-req-001.req.yaml <<'YAML'
+          id: SYS-REQ-001
+          title: Test requirement
+          description: The system shall pass this test.
+          type: guarantee
+          component: test
+          YAML
+
+      - uses: ./
+        id: audit
+        continue-on-error: true
+        with:
+          working-directory: /tmp/test-project
+          fail-level: error
+          format: markdown
+
+      - name: Show results
+        run: |
+          echo "Exit code: ${{ steps.audit.outputs.exit-code }}"
+          echo "Errors: ${{ steps.audit.outputs.errors }}"
+          echo "Warnings: ${{ steps.audit.outputs.warnings }}"
+          echo "Summary: ${{ steps.audit.outputs.summary }}"
+
+  # Test 3: Verify outputs are set
+  test-outputs:
+    name: Test outputs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./
+        id: audit
+        continue-on-error: true
+        with:
+          fail-level: error
+
+      - name: Check outputs exist
+        run: |
+          echo "exit-code: '${{ steps.audit.outputs.exit-code }}'"
+          echo "summary: '${{ steps.audit.outputs.summary }}'"
+          # exit-code should always be set
+          if [ -z "${{ steps.audit.outputs.exit-code }}" ]; then
+            echo "::error::exit-code output not set"
+            exit 1
+          fi
