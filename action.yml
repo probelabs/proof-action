@@ -88,8 +88,9 @@ runs:
           esac
 
           if [ "$INPUT_VERSION" = "latest" ]; then
-            # Latest channel uses simplified filenames without version in name
-            local url="https://downloads.reqproof.com/releases/latest/proof_${os}_${arch}.tar.gz"
+            # Latest channel uses simplified filenames without version in name.
+            # Add cache buster to avoid CDN serving stale artifacts.
+            local url="https://downloads.reqproof.com/releases/latest/proof_${os}_${arch}.tar.gz?t=$(date +%s)"
           else
             local url="https://downloads.reqproof.com/releases/${INPUT_VERSION}/proof_${INPUT_VERSION}_${os}_${arch}.tar.gz"
           fi
