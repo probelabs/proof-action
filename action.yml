@@ -88,18 +88,12 @@ runs:
           esac
 
           if [ "$INPUT_VERSION" = "latest" ]; then
-            version_tag="$(curl -sL -H 'Accept: application/vnd.github+json' \
-              https://api.github.com/repos/probelabs/proof/releases/latest \
-              | grep '"tag_name"' | head -1 | cut -d'"' -f4)"
-            if [ -z "$version_tag" ]; then
-              echo "::error::Failed to determine latest proof release version"
-              return 1
-            fi
+            version_tag="latest"
           else
-            version_tag="v${INPUT_VERSION#v}"
+            version_tag="${INPUT_VERSION}"
           fi
 
-          local url="https://github.com/probelabs/proof/releases/download/${version_tag}/proof_${os}_${arch}.tar.gz"
+          local url="https://pub-ccebb4aa45944de7a72edc403634a318.r2.dev/releases/${version_tag}/proof_${version_tag}_${os}_${arch}.tar.gz"
           echo "Downloading ${url}..."
 
           local tmpdir
