@@ -42,7 +42,7 @@ if [ -n "${INPUT_FORMAT:-}" ]; then
   CMD+=("--format" "$INPUT_FORMAT")
 fi
 
-if [ -n "${INPUT_SCOPE:-}" ] && [ "$INPUT_SCOPE" != "full" ]; then
+if [ -n "${INPUT_SCOPE:-}" ]; then
   CMD+=("--scope" "$INPUT_SCOPE")
 fi
 
