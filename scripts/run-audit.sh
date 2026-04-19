@@ -31,6 +31,15 @@ if [ ! -f "reqproof.yaml" ] && [ ! -f "proof.yaml" ] && [ ! -d "specs" ]; then
   exit 0
 fi
 
+# Pre-download solvers (Z3, Kind2) so audit checks can use them.
+# The solver manager auto-downloads during verify but audit checks
+# query solver availability separately. Running verify-properties
+# triggers the download to ~/.proof/solvers/ before the audit.
+if [ -d "specs" ]; then
+  echo "Pre-downloading solvers..."
+  "$PROOF" verify-properties specs/* 2>&1 | tail -3 || true
+fi
+
 # Build the audit command
 CMD=("$PROOF" "audit")
 
