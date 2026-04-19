@@ -93,7 +93,7 @@ runs:
             version_tag="${INPUT_VERSION}"
           fi
 
-          local url="https://pub-ccebb4aa45944de7a72edc403634a318.r2.dev/releases/${version_tag}/proof_${version_tag}_${os}_${arch}.tar.gz"
+          local url="https://downloads.reqproof.com/releases/${version_tag}/proof_${version_tag}_${os}_${arch}.tar.gz"
           echo "Downloading ${url}..."
 
           local tmpdir
